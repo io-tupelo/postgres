@@ -1,7 +1,6 @@
-(ns tst.demo.pg1
-  (:use demo.sql tupelo.core tupelo.test)
+(ns tst.io-tupelo.jsonb
+  (:use io-tupelo.jsonb tupelo.core tupelo.test)
   (:require
-    [clojure.data :as data]
     [next.jdbc :as jdbc]
     [next.jdbc.result-set :as rs]
     [next.jdbc.sql :as sql]
@@ -22,45 +21,47 @@
 (def conn (jdbc/get-datasource db-info)) ; returns an inner class: "next.jdbc.connection$..."
 
 ;---------------------------------------------------------------------------------------------------
-(s/defn drop-index
-  [name :- s/Str]
-  (jdbc/execute! conn [(format "drop index if exists %s" name)]))
-
-(s/defn drop-table
-  [name :- s/Str]
-  (jdbc/execute! conn [(format "drop table if exists %s" name)]))
-
-(s/defn exec-cmd
-  [cmd :- s/Str]
-  (jdbc/execute! conn [cmd]))
-
-(def index-name->cmd
+(def index-name->create-cmd
   {"idx_gin_my_stuff" "create index idx_gin_my_stuff on my_stuff using gin (content)"
    })
 
-(def table-name->cmd
+(def table-name->create-cmd
   {"my_stuff" "create table my_stuff (
                     id         text primary key,
                     content    jsonb )"
    })
 
-(defn drop-create-indexes
-  [conn]
-  (doseq [name (keys index-name->cmd)]
-    (drop-index name)
-    (exec-cmd (grab name index-name->cmd))))
+;---------------------------------------------------------------------------------------------------
+(s/defn drop-index!
+  [name :- s/Str]
+  (jdbc/execute! conn [(format "drop index if exists %s" name)]))
 
-(defn drop-create-tables
-  [conn]
-  (doseq [name (keys table-name->cmd)]
-    (drop-table name)
-    (exec-cmd (grab name table-name->cmd))))
+(s/defn drop-table!
+  [name :- s/Str]
+  (jdbc/execute! conn [(format "drop table if exists %s" name)]))
 
+(s/defn exec-cmd!
+  [cmd :- s/Str]
+  (jdbc/execute! conn [cmd]))
+
+(defn drop-create-tables!
+  [conn]
+  (doseq [name (keys table-name->create-cmd)]
+    (drop-table! name)
+    (exec-cmd! (grab name table-name->create-cmd))))
+
+(defn drop-create-indexes!
+  [conn]
+  (doseq [name (keys index-name->create-cmd)]
+    (drop-index! name)
+    (exec-cmd! (grab name index-name->create-cmd))))
+
+;---------------------------------------------------------------------------------------------------
 (verify
   ; verify form of connection string
   (is (truthy? (re-matches #"jdbc:postgresql://.*/acme_v01" (str conn))))
 
-  (drop-create-tables conn)
+  (drop-create-tables! conn)
   (when true
     (sql/insert! conn :my_stuff {:id      "id001"
                                  :content {:my_group
@@ -109,31 +110,11 @@
       (is= found expected)))
 
 
-  (comment
-    (let [r22 (jdbc/execute-one! conn ["
-                  insert into address(name, email)
-                    values( 'Marge Simpson', 'marge@springfield.co' ) "]
-                {:return-keys true})
-          r23 (jdbc/execute-one! conn ["select * from address where id= ?" 2])]
-      (is= r22 #:address{:id 2 :name "Marge Simpson" :email "marge@springfield.co"})
-      (is= r23 #:address{:id 2 :name "Marge Simpson" :email "marge@springfield.co"}))
-
-    (let [r32     (jdbc/execute-one! conn ["
-                insert into address(name, email)
-                  values( 'Bart Simpson', 'bart@mischief.com' ) "]
-                    {:return-keys true :builder-fn rs/as-unqualified-lower-maps})
-          r33     (jdbc/execute-one! conn ["select * from address where id= ?" 3]
-                    {:builder-fn rs/as-unqualified-lower-maps})
-          ds-opts (jdbc/with-options conn {:builder-fn rs/as-lower-maps})
-          r34     (jdbc/execute-one! ds-opts ["select * from address where id= ?" 3])
-          ]
-      (is= r32 {:id 3 :name "Bart Simpson" :email "bart@mischief.com"})
-      (is= r33 {:id 3 :name "Bart Simpson" :email "bart@mischief.com"})
-      (is= r34 #:address{:id 3 :name "Bart Simpson" :email "bart@mischief.com"}))))
+  )
 
 (verify
-  (drop-create-tables conn)
-  (drop-create-indexes conn)
+  (drop-create-tables! conn)
+  (drop-create-indexes! conn)
   (sql/insert! conn :my_stuff {:id      "id001"
                                :content {:a 1 :b 2}})
   (sql/insert! conn :my_stuff {:id      "id002"
@@ -149,6 +130,29 @@
 
   (let [r3    (vec (sql/query conn ["select * from my_stuff where content['b']['c'] = '3'"]))]
     (is= r3 [#:my_stuff{:content {:a 11, :b {:c 3}}, :id "id002"}] )))
+
+;---------------------------------------------------------------------------------------------------
+(comment
+  (let [r22 (jdbc/execute-one! conn ["
+                  insert into address(name, email)
+                    values( 'Marge Simpson', 'marge@springfield.co' ) "]
+              {:return-keys true})
+        r23 (jdbc/execute-one! conn ["select * from address where id= ?" 2])]
+    (is= r22 #:address{:id 2 :name "Marge Simpson" :email "marge@springfield.co"})
+    (is= r23 #:address{:id 2 :name "Marge Simpson" :email "marge@springfield.co"}))
+
+  (let [r32     (jdbc/execute-one! conn ["
+                insert into address(name, email)
+                  values( 'Bart Simpson', 'bart@mischief.com' ) "]
+                  {:return-keys true :builder-fn rs/as-unqualified-lower-maps})
+        r33     (jdbc/execute-one! conn ["select * from address where id= ?" 3]
+                  {:builder-fn rs/as-unqualified-lower-maps})
+        ds-opts (jdbc/with-options conn {:builder-fn rs/as-lower-maps})
+        r34     (jdbc/execute-one! ds-opts ["select * from address where id= ?" 3])
+        ]
+    (is= r32 {:id 3 :name "Bart Simpson" :email "bart@mischief.com"})
+    (is= r33 {:id 3 :name "Bart Simpson" :email "bart@mischief.com"})
+    (is= r34 #:address{:id 3 :name "Bart Simpson" :email "bart@mischief.com"})))
 
 ;---------------------------------------------------------------------------------------------------
 (verify
@@ -194,12 +198,12 @@
           lang    varchar not null
         ) "])
 
-    ; NOTE: Postgres reserves 'desc' for 'descending' (unlike H2), so must use 'descr' here
+    ; NOTE: Postgres reserves 'desc' for 'descending' (unlike H2), so must use 'description' here
     (jdbc/execute-one! conn ["
         create table releases (
-          id        serial,
-          descr      varchar not null,
-          langId    numeric
+          id              serial,
+          description     varchar not null,
+          langId          numeric
         ) "]))
   (is= [] (sql/query conn ["select * from langs"])) ; table exists and is empty
 
@@ -220,41 +224,41 @@
       (let [clj-id (grab :langs/id (only (sql/query tx-opts ["select id from langs where lang='Clojure'"])))] ; all 1 string
         (is= 1 clj-id)
         (sql/insert-multi! tx-opts :releases
-          [:descr :langId]
+          [:description :langId]
           [["ancients" clj-id]
            ["1.8" clj-id]
            ["1.9" clj-id]]))
       (let [java-id (grab :langs/id (only (sql/query tx-opts ["select id from langs where lang=?" "Java"])))] ; with query param
         (is= 2 java-id)
         (sql/insert-multi! tx-opts :releases
-          [:descr :langId]
+          [:description :langId]
           [["dusty" java-id]
            ["8" java-id]
            ["9" java-id]
            ["10" java-id]]))
 
       (let [; note cannot wrap select list in parens or get "bulk" output
-            result-0 (sql/query tx-opts ["select langs.lang, releases.descr
+            result-0 (sql/query tx-opts ["select langs.lang, releases.description
                                             from    langs join releases
                                               on     (langs.id = releases.langId)
                                               where  (lang = 'Clojure') "])
-            result-1 (sql/query tx-opts ["select l.lang, r.descr
+            result-1 (sql/query tx-opts ["select l.lang, r.description
                                             from    langs as l
                                                       join releases as r
                                               on     (l.id = r.langId)
                                               where  (l.lang = 'Clojure') "])
-            result-2 (sql/query tx-opts ["select langs.lang, releases.descr
+            result-2 (sql/query tx-opts ["select langs.lang, releases.description
                                             from    langs, releases
                                               where  ( (langs.id = releases.langId)
                                                 and    (lang = 'Clojure') ) "])
-            result-3 (sql/query tx-opts ["select l.lang, r.descr
+            result-3 (sql/query tx-opts ["select l.lang, r.description
                                             from    langs as l, releases as r
                                               where  ( (l.id = r.langId)
                                                 and    (l.lang = 'Clojure') ) "])
             ]
-        (let [expected [{:langs/lang "Clojure", :releases/descr "ancients"}
-                        {:langs/lang "Clojure", :releases/descr "1.8"}
-                        {:langs/lang "Clojure", :releases/descr "1.9"}]]
+        (let [expected [{:langs/lang "Clojure", :releases/description "ancients"}
+                        {:langs/lang "Clojure", :releases/description "1.8"}
+                        {:langs/lang "Clojure", :releases/description "1.9"}]]
           (is-set= result-0 expected)
           (is-set= result-1 expected)
           (is-set= result-2 expected)

@@ -1,28 +1,25 @@
-(ns demo.sql
+(ns io-tupelo.jsonb
+  "Helper functions from next.jdbc docs to handle clj<->jsonb I/O"
   (:use tupelo.core)
   (:require
     [jsonista.core :as json]
     [next.jdbc :as jdbc]
     [next.jdbc.prepare :as prepare]
     [next.jdbc.result-set :as rs]
-    [next.jdbc.sql :as sql]
-    )
+    [next.jdbc.sql :as sql])
   (:import
     [clojure.lang IPersistentMap IPersistentVector]
     [java.sql PreparedStatement]
-    [org.postgresql.util PGobject]
-    ))
+    [org.postgresql.util PGobject]))
 
 ; (set! *warn-on-reflection* true)
 
 ;---------------------------------------------------------------------------------------------------
-; Helper functions from next.jdbc docs to handle clj<->jsonb I/O
-
-; :decode-key-fn here specifies that JSON-keys will become keywords:
-(comment
+(comment   ; origin EDN<->JSON conversion replaced with tupelo.core: edn->json & json->edn
+  ; :decode-key-fn here specifies that JSON-keys will become keywords:
   (def mapper (json/object-mapper {:decode-key-fn keyword}))
-  (def ->json json/write-value-as-string) ; #todo or use tupelo.core/edn->json
-  (def <-json #(json/read-value % mapper))) ; #todo or use tupelo.core/json->edn
+  (def ->json json/write-value-as-string)
+  (def <-json #(json/read-value % mapper)))
 
 (defn ->pgobject
   "Transforms Clojure data to a PGobject that contains the data as

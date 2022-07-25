@@ -1,0 +1,34 @@
+
+= Rewards Config demo project
+
+== Before running unit tests:
+
+1. Install Docker
+2. Start Postgres
+
+    ./pg-start.bash
+
+3. Create Postgres table 'rewards_config_v1' using `psql` (only required prior to first run)
+
+    ./psql-start.bash
+    postgres=# create database rewards_config_v1;
+    postgres=# <CTRL-D>     # exit psql
+
+== Run unit tests
+
+Use Leiningen as normal
+
+    lein clean ; lein run
+
+== Cleanup after running unit tests
+
+Terminate Postgres
+
+  ./pg-stop.bash
+
+== Development Environment
+
+Developed using link:https://www.jetbrains.com/idea/[*IntelliJ IDEA*] 
+with the link:https://cursive-ide.com/[*Cursive* Clojure plugin].
+
+

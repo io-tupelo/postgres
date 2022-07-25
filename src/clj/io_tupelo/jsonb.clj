@@ -21,10 +21,9 @@
   (def ->json json/write-value-as-string)
   (def <-json #(json/read-value % mapper)))
 
-(defn ->pgobject
-  "Transforms Clojure data to a PGobject that contains the data as
-  JSON. PGObject type defaults to `jsonb` but can be changed via
-  metadata key `:pgtype`"
+(defn ^:no-doc ->pgobject
+  "Transforms Clojure data to a PGobject that contains the data as JSON.
+  PGObject type defaults to `jsonb` but can be changed via metadata key `:pgtype`"
   [x]
   (let [pgtype (or (:pgtype (meta x))
                  "jsonb")]
@@ -32,9 +31,8 @@
       (.setType pgtype)
       (.setValue (edn->json x)))))
 
-(defn <-pgobject
-  "Transform PGobject containing `json` or `jsonb` value to Clojure
-  data."
+(defn ^:no-doc <-pgobject
+  "Transform PGobject containing `json` or `jsonb` value to Clojure data."
   [^PGobject v]
   (let [type  (.getType v)
         value (.getValue v)]

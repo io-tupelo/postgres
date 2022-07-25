@@ -1,4 +1,4 @@
-(defproject tupelo/postgres "0.1.0-SNAPSHOT"
+(defproject io-tupelo/postgres "0.1.0-SNAPSHOT"
   :dependencies [
                  [metosin/jsonista "0.3.6"]
                  [org.clojure/clojure "1.11.1"]

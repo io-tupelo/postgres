@@ -1,5 +1,5 @@
 (ns demo.sql
-  (:use tupelo.core tupelo.test)
+  (:use tupelo.core)
   (:require
     [jsonista.core :as json]
     [next.jdbc :as jdbc]
@@ -13,7 +13,7 @@
     [org.postgresql.util PGobject]
     ))
 
-(set! *warn-on-reflection* true)
+; (set! *warn-on-reflection* true)
 
 ;---------------------------------------------------------------------------------------------------
 ; Helper functions from next.jdbc docs to handle clj<->jsonb I/O
@@ -46,8 +46,8 @@
         (with-meta (json->edn value) {:pgtype type}))
       value)))
 
-;; if a SQL parameter is a Clojure hash map or vector, it'll be transformed
-;; to a PGobject for JSON/JSONB:
+; if a SQL parameter is a Clojure hash map or vector, it'll be transformed
+; to a PGobject for JSON/JSONB:
 (extend-protocol prepare/SettableParameter
   IPersistentMap
   (set-parameter [m ^PreparedStatement s i]
@@ -57,11 +57,12 @@
   (set-parameter [v ^PreparedStatement s i]
     (.setObject s i (->pgobject v))))
 
-;; if a row contains a PGobject then we'll convert them to Clojure data
-;; while reading (if column is either "json" or "jsonb" type):
+; if a row contains a PGobject then we'll convert them to Clojure data
+; while reading (if column is either "json" or "jsonb" type):
 (extend-protocol rs/ReadableColumn
   PGobject
   (read-column-by-label [^PGobject v _]
     (<-pgobject v))
   (read-column-by-index [^PGobject v _2 _3]
     (<-pgobject v)))
+

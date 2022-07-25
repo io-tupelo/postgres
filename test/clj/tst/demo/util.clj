@@ -1,8 +1,7 @@
 (ns tst.demo.util
   (:use demo.util tupelo.core tupelo.test)
   (:require
-    [tupelo.string :as str])
-  )
+    [tupelo.string :as str]))
 
 (verify
   (is= nil (str-norm-safe nil))

@@ -3,8 +3,9 @@
   (:require
     [clojure.walk :as walk]
     [schema.core :as s]
+    [tupelo.schema :as tsk]
     [tupelo.string :as str]
-    [tupelo.schema :as tsk]))
+    ))
 
 (s/defn str-norm-safe :- s/Any ; => tupelo.string/normalize[-safe]
   [arg :- s/Any]

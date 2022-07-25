@@ -1,8 +1,5 @@
-(ns ^:test-refresh/focus
-  tst.demo.pg1
-  (:use demo.sql
-        tupelo.core
-        tupelo.test)
+(ns tst.demo.pg1
+  (:use demo.sql tupelo.core tupelo.test)
   (:require
     [clojure.data :as data]
     [next.jdbc :as jdbc]

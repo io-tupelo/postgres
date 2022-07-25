@@ -3,16 +3,24 @@
 
 == Before running unit tests:
 
-1. Install Docker
+1. Install Docker (Docker Desktop for development on a Mac/PC)
+
 2. Start Postgres
 
     ./pg-start.bash
 
-3. Create Postgres table 'rewards_config_v1' using `psql` (only required prior to first run)
+3. Check version of `psql` tool
 
-    ./psql-start.bash
-    postgres=# create database rewards_config_v1;
-    postgres=# <CTRL-D>     # exit psql
+    ./psql-start.bash --version
+
+4. Check version of Postgres database
+
+    ./psql-start.bash -c'select version()'
+
+5. Create Postgres table 'acme_v01' using `psql` (only required prior to first run)
+
+
+    ./psql-start.bash -c'create database acme_v01'
 
 == Run unit tests
 
@@ -26,9 +34,15 @@ Terminate Postgres
 
   ./pg-stop.bash
 
-== Development Environment
+== Optional
 
-Developed using link:https://www.jetbrains.com/idea/[*IntelliJ IDEA*] 
-with the link:https://cursive-ide.com/[*Cursive* Clojure plugin].
+You can run commands in `psql` interactively as well:
+
+    ./psql-start.bash
+    postgres=# select version();    # print the Postgres version
+    postgres=# \h                   # get SQL help
+    postgres=# \?                   # get psql help
+    postgres=# \q                   # exit psql (or <Ctrl-D>)
+
 
 

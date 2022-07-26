@@ -1,5 +1,6 @@
 (ns tst.io-tupelo.jsonb
-  (:use  tupelo.core tupelo.test)
+  (:use tupelo.core
+        tupelo.test)
   (:require
     [io-tupelo.jsonb :as jsonb]
     [next.jdbc :as jdbc]
@@ -14,7 +15,7 @@
   (is= :item (jsonb/namespace-strip :something.really.big/item))
   (is= 'item (jsonb/namespace-strip 'something.really.big/item))
   (is= (jsonb/walk-namespace-strip
-      {:a 1 :my/b [1 'her/c 3] :his/d {:e 5 :other/f :very.last/one}})
+         {:a 1 :my/b [1 'her/c 3] :his/d {:e 5 :other/f :very.last/one}})
     {:a 1 :b [1 'c 3] :d {:e 5 :f :one}}))
 
 ;---------------------------------------------------------------------------------------------------
@@ -99,71 +100,68 @@
     (is= (only (sql/query conn [cmd]))
       #:my_stuff{:content {:a 1, :b 2}, :id "id001"}))
 
-  (let [cmd (it-> {:b {:c 3}}
-              (jsonb/edn->json-embedded it)
-              (str "select id from my_stuff where content @> " it)
-              )
+  (let [cmd    (it-> {:b {:c 3}}
+                 (jsonb/edn->json-embedded it)
+                 (str "select id from my_stuff where content @> " it)
+                 )
         result (only (sql/query conn [cmd]))]
     (is= (jsonb/walk-namespace-strip result) ; 0.03 sec on laptop
       {:id "id002"}))
   )
 
 ;---------------------------------------------------------------------------------------------------
-(when true
-  (verify
-    (drop-create-tables! conn)
-    (drop-create-indexes! conn)
-    (sql/insert! conn :my_stuff {:id      "id001"
-                                 :content {:my_group
-                                           {:created_at  "2001-12-31T11:22:33Z"
-                                            :description "ogre"
-                                            :offerings   [{:created_at    "1999-12-31T11:22:33Z"
-                                                           :ok?           true
-                                                           :description   "very good"
-                                                           :duration      12
-                                                           :duration_unit "month"
-                                                           :misc          nil
-                                                           :percent       2.0
-                                                           :amount        50000.0}
-                                                          {:created_at    "2022-12-31T10:22:33Z"
-                                                           :ok?           true
-                                                           :description   "very bad"
-                                                           :duration      30
-                                                           :duration_unit "days"
-                                                           :misc          :something
-                                                           :percent       3.0
-                                                           :amount        500.0}]}}})
+(verify
+  (drop-create-tables! conn)
+  (drop-create-indexes! conn)
+  (sql/insert! conn :my_stuff {:id      "id001"
+                               :content {:my_group
+                                         {:created_at  "2001-12-31T11:22:33Z"
+                                          :description "ogre"
+                                          :offerings   [{:created_at    "1999-12-31T11:22:33Z"
+                                                         :ok?           true
+                                                         :description   "very good"
+                                                         :duration      12
+                                                         :duration_unit "month"
+                                                         :misc          nil
+                                                         :percent       2.0
+                                                         :amount        50000.0}
+                                                        {:created_at    "2022-12-31T10:22:33Z"
+                                                         :ok?           true
+                                                         :description   "very bad"
+                                                         :duration      30
+                                                         :duration_unit "days"
+                                                         :misc          :something
+                                                         :percent       3.0
+                                                         :amount        500.0}]}}})
 
 
-    (let [found    (only (sql/query conn ["select * from my_stuff"]))
-          expected #:my_stuff{:id      "id001"
-                              :content {:my_group
-                                        {:created_at  "2001-12-31T11:22:33Z"
-                                         :description "ogre"
-                                         :offerings   [{:amount        50000.0
-                                                        :created_at    "1999-12-31T11:22:33Z"
-                                                        :description   "very good"
-                                                        :duration      12
-                                                        :duration_unit "month"
-                                                        :misc          nil
-                                                        :ok?           true
-                                                        :percent       2.0}
-                                                       {:amount        500.0
-                                                        :created_at    "2022-12-31T10:22:33Z"
-                                                        :description   "very bad"
-                                                        :duration      30
-                                                        :duration_unit "days"
-                                                        :misc          "something"
-                                                        :ok?           true
-                                                        :percent       3.0}]}}}]
-      (is= found expected))
+  (let [found    (jsonb/walk-namespace-strip
+                   (only (sql/query conn ["select * from my_stuff"])))
+        expected {:id      "id001"
+                  :content {:my_group
+                            {:created_at  "2001-12-31T11:22:33Z"
+                             :description "ogre"
+                             :offerings   [{:amount        50000.0
+                                            :created_at    "1999-12-31T11:22:33Z"
+                                            :description   "very good"
+                                            :duration      12
+                                            :duration_unit "month"
+                                            :misc          nil
+                                            :ok?           true
+                                            :percent       2.0}
+                                           {:amount        500.0
+                                            :created_at    "2022-12-31T10:22:33Z"
+                                            :description   "very bad"
+                                            :duration      30
+                                            :duration_unit "days"
+                                            :misc          "something"
+                                            :ok?           true
+                                            :percent       3.0}]}}}]
+    (is= found expected))
 
-    (let [res (vec (sql/query conn ["select id from my_stuff where
-            content['my_group']['offerings'] @> '[{\"description\": \"very bad\"}]'  "]))]
-      (is= res [#:my_stuff{:id "id001"}]))
-    )
-
-  )
+  (let [res (sql/query conn ["select id from my_stuff where
+            content['my_group']['offerings'] @> '[{\"description\": \"very bad\"}]'  "])]
+    (is= res [#:my_stuff{:id "id001"}])))
 
 
 ;---------------------------------------------------------------------------------------------------

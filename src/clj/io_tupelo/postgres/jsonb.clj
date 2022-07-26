@@ -68,13 +68,4 @@
   [data]
   (format "' %s '" (t/edn->json data)))
 
-(defn namespace-strip
-  "Removes the namespace part from any keyword or symbol, otherwise NOOP."
-  [item]
-  (t/cond-it-> item
-    (keyword? it) (keyword (name it))
-    (symbol? it) (symbol (name it))))
 
-(defn walk-namespace-strip
-  "Recursively walks a datastructure, removing the namespace from any keyword or symbol"
-  [data] (walk/postwalk namespace-strip data))

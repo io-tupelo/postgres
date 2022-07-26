@@ -4,14 +4,15 @@
     [io-tupelo.postgres.jsonb :as jsonb]
     [next.jdbc :as jdbc]
     [next.jdbc.sql :as sql]
-    [schema.core :as s]
+    [tupelo.misc :as misc]
+    [tupelo.string :as str]
     ))
 
 (verify   ; only enable this during testing
   (set! *warn-on-reflection* true))
 
 ;---------------------------------------------------------------------------------------------------
-(verify
+#_(verify
   (is= 5 (jsonb/namespace-strip 5))
   (is= "abc" (jsonb/namespace-strip "abc"))
   (is= :item (jsonb/namespace-strip :something.really.big/item))
@@ -99,7 +100,7 @@
                  (jsonb/edn->json-embedded it)
                  (str "select id from my_stuff where content @> " it))
         result (only (sql/query conn [cmd]))]
-    (is= (jsonb/walk-namespace-strip result) ; 0.03 sec on laptop
+    (is= (misc/walk-namespace-strip result) ; 0.03 sec on laptop
       {:id "id002"}))
   )
 
@@ -129,7 +130,7 @@
                                                          :amount        500.0}]}}})
 
 
-  (let [found    (jsonb/walk-namespace-strip
+  (let [found    (misc/walk-namespace-strip
                    (only (sql/query conn ["select * from my_stuff"])))
         expected {:id      "id001"
                   :content {:my_group

@@ -1,14 +1,23 @@
 (ns tst.io-tupelo.jsonb
-  (:use io-tupelo.jsonb
-        tupelo.core
-        tupelo.test)
+  (:use  tupelo.core tupelo.test)
   (:require
+    [io-tupelo.jsonb :as jsonb]
     [next.jdbc :as jdbc]
-    [next.jdbc.result-set :as rs]
     [next.jdbc.sql :as sql]
     [schema.core :as s]
     ))
 
+;---------------------------------------------------------------------------------------------------
+(verify
+  (is= 5 (jsonb/namespace-strip 5))
+  (is= "abc" (jsonb/namespace-strip "abc"))
+  (is= :item (jsonb/namespace-strip :something.really.big/item))
+  (is= 'item (jsonb/namespace-strip 'something.really.big/item))
+  (is= (jsonb/walk-namespace-strip
+      {:a 1 :my/b [1 'her/c 3] :his/d {:e 5 :other/f :very.last/one}})
+    {:a 1 :b [1 'c 3] :d {:e 5 :f :one}}))
+
+;---------------------------------------------------------------------------------------------------
 ;---------------------------------------------------------------------------------------------------
 ; NOTE: ***** Must MANUALLY  create DB 'acme_v01' before run this test! *****
 ;       In PSQL, do `create database acme_v01;`.  See the README.
@@ -71,19 +80,32 @@
   (sql/insert! conn :my_stuff {:id      "id002"
                                :content {:a 11 :b {:c 3}}})
 
-  (let [res (vec (sql/query conn ["select * from my_stuff"]))]
-    (is= res
-      [#:my_stuff{:content {:a 1, :b 2}, :id "id001"}
-       #:my_stuff{:content {:a 11, :b {:c 3}}, :id "id002"}]))
+  (is= (vec (sql/query conn ["select * from my_stuff"]))
+    [#:my_stuff{:content {:a 1, :b 2}, :id "id001"}
+     #:my_stuff{:content {:a 11, :b {:c 3}}, :id "id002"}])
 
-  (let [r2 (vec (sql/query conn ["select * from my_stuff where content['a'] = '1'"]))]
-    (is= r2 [#:my_stuff{:content {:a 1, :b 2}, :id "id001"}]))
+  (is= (vec (sql/query conn ["select * from my_stuff where content['a'] = '1'"]))
+    [#:my_stuff{:content {:a 1, :b 2}, :id "id001"}])
 
-  (let [r3 (vec (sql/query conn ["select * from my_stuff where content['b']['c'] = '3'"]))]
-    (is= r3 [#:my_stuff{:content {:a 11, :b {:c 3}}, :id "id002"}]))
+  (let [r3 (only (sql/query conn ["select * from my_stuff where content['b']['c'] = '3'"]))]
+    (is= r3 #:my_stuff{:content {:a 11, :b {:c 3}}, :id "id002"}))
 
-  (let [res (vec (sql/query conn ["select * from my_stuff where content @> '{\"a\": 1}' "]))]
-    (is= res [#:my_stuff{:content {:a 1, :b 2}, :id "id001"}]))
+  (is= (only (sql/query conn ["select * from my_stuff where content @> '{\"a\": 1}' "]))
+    #:my_stuff{:content {:a 1, :b 2}, :id "id001"})
+
+  (let [cmd (it-> {:a 1}
+              (jsonb/edn->json-embedded it)
+              (str "select * from my_stuff where content @> " it))]
+    (is= (only (sql/query conn [cmd]))
+      #:my_stuff{:content {:a 1, :b 2}, :id "id001"}))
+
+  (let [cmd (it-> {:b {:c 3}}
+              (jsonb/edn->json-embedded it)
+              (str "select id from my_stuff where content @> " it)
+              )
+        result (only (sql/query conn [cmd]))]
+    (is= (jsonb/walk-namespace-strip result) ; 0.03 sec on laptop
+      {:id "id002"}))
   )
 
 ;---------------------------------------------------------------------------------------------------

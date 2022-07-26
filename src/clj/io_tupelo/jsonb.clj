@@ -6,7 +6,8 @@
     [next.jdbc :as jdbc]
     [next.jdbc.prepare :as prepare]
     [next.jdbc.result-set :as rs]
-    [next.jdbc.sql :as sql])
+    [next.jdbc.sql :as sql]
+    [clojure.walk :as walk])
   (:import
     [clojure.lang IPersistentMap IPersistentVector]
     [java.sql PreparedStatement]
@@ -61,3 +62,20 @@
   (read-column-by-index [^PGobject v _2 _3]
     (<-pgobject v)))
 
+;---------------------------------------------------------------------------------------------------
+(defn edn->json-embedded
+  "Accepts a Clojure EDN data structure like `{:a 1 :b {:c 3}}` and converts it into a JSON string,
+  then surrounds it with single-quotes. The result is suitable for inclusion in a Postgres JSONB expression."
+  [data]
+  (format "' %s '" (edn->json data)))
+
+(defn namespace-strip
+  "Removes namespace from any keyword or symbol, otherwise NOOP."
+  [item]
+  (cond-it-> item
+    (keyword? item) (keyword (name item))
+    (symbol? item) (symbol (name item))))
+
+(defn walk-namespace-strip
+  "Recursively walks a datastructure, removing the namespace from any keyword or symbol"
+  [data] (walk/postwalk namespace-strip data))

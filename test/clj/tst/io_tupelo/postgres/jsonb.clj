@@ -1,12 +1,14 @@
-(ns tst.io-tupelo.jsonb
-  (:use tupelo.core
-        tupelo.test)
+(ns tst.io-tupelo.postgres.jsonb
+  (:use tupelo.core tupelo.test)
   (:require
-    [io-tupelo.jsonb :as jsonb]
+    [io-tupelo.postgres.jsonb :as jsonb]
     [next.jdbc :as jdbc]
     [next.jdbc.sql :as sql]
     [schema.core :as s]
     ))
+
+(verify   ; only enable this during testing
+  (set! *warn-on-reflection* true))
 
 ;---------------------------------------------------------------------------------------------------
 (verify

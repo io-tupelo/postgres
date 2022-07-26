@@ -1,4 +1,4 @@
-(ns io-tupelo.jsonb
+(ns io-tupelo.postgres.jsonb
   "Helper functions from next.jdbc docs to handle clj<->jsonb I/O"
   (:use tupelo.core)
   (:require
@@ -12,8 +12,6 @@
     [clojure.lang IPersistentMap IPersistentVector]
     [java.sql PreparedStatement]
     [org.postgresql.util PGobject]))
-
-; (set! *warn-on-reflection* true)
 
 ;---------------------------------------------------------------------------------------------------
 (comment   ; origin EDN<->JSON conversion replaced with tupelo.core: edn->json & json->edn

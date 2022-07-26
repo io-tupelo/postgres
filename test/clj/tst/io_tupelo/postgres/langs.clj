@@ -1,5 +1,5 @@
-(ns tst.io-tupelo.langs
-  (:use io-tupelo.jsonb tupelo.core tupelo.test)
+(ns tst.io-tupelo.postgres.langs
+  (:use tupelo.core tupelo.test)
   (:require
     [next.jdbc :as jdbc]
     [next.jdbc.result-set :as rs]

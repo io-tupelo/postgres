@@ -1,5 +1,5 @@
-(ns tst.io-tupelo.invoice
-  (:use io-tupelo.jsonb tupelo.core tupelo.test)
+(ns tst.io-tupelo.postgres.invoice
+  (:use tupelo.core tupelo.test)
   (:require
     [next.jdbc :as jdbc]
     [next.jdbc.result-set :as rs]

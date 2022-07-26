@@ -1,10 +1,9 @@
-(ns tst.io-tupelo.simpsons
-  (:use io-tupelo.jsonb tupelo.core tupelo.test)
+(ns tst.io-tupelo.postgres.simpsons
+  (:use tupelo.core tupelo.test)
   (:require
     [next.jdbc :as jdbc]
     [next.jdbc.result-set :as rs]
     [next.jdbc.sql :as sql]
-    [schema.core :as s]
     ))
 
 ;---------------------------------------------------------------------------------------------------

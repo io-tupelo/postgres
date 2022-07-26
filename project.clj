@@ -5,7 +5,7 @@
                  [org.postgresql/postgresql "42.4.0"] ; see https://mvnrepository.com/artifact/org.postgresql/postgresql for info
                  [prismatic/schema "1.3.0"]
                  [seancorfield/next.jdbc "1.2.659"]
-                 [tupelo "22.07.04"]
+                 [tupelo "22.07.25a"]
                  ]
   :plugins [
             [com.jakemccrary/lein-test-refresh "0.25.0"]

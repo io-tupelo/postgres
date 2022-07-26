@@ -1,26 +1,16 @@
 (ns tst.demo.util
-  (:use demo.util tupelo.core tupelo.test)
-  (:require
-    [tupelo.string :as str]))
+  (:use demo.util tupelo.core tupelo.test))
 
 (verify
-  (is= nil (str-norm-safe nil))
-  (is= "hello there!" (str-norm-safe "  Hello THERE!  "))
+  (is= nil (walk-normalize nil))
+  (is= (walk-normalize "  Hello THERE!  ")
+    "hello there!")
 
-  (is= nil (str-trim-safe nil))
-  (is= "Hello THERE!" (str-trim-safe "  Hello THERE!  ")))
-
-(verify
   (let [m {:a 1
            :b "  Hello There "
            :c nil}]
-    (is= (whitespace-collapse-vals m)
+    (is= (walk-whitespace-collapse m)
       {:a 1
        :b "Hello There"
-       :c nil})
-    ))
-
-
-
-
+       :c nil})))
 

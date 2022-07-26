@@ -7,22 +7,18 @@
     [tupelo.string :as str]
     ))
 
-(s/defn str-norm-safe :- s/Any ; => tupelo.string/normalize[-safe]
-  [arg :- s/Any]
-  (if (string? arg)
-    (str/lower-case (str/whitespace-collapse arg))
-    arg))
-
-(s/defn str-trim-safe :- s/Any
-  [arg :- s/Any]
-  (if (string? arg)
-    (str/trim arg)
-    arg))
-
-(s/defn whitespace-collapse-vals :- tsk/KeyMap
-  [tx :- tsk/KeyMap]
-  (map-vals tx
+(defn walk-normalize ; => tupelo.string.safe/walk-normalize
+  [data]
+  (walk/postwalk
     (fn [arg]
-      (if (string? arg)
-        (str/whitespace-collapse arg)
-        arg))))
+      (cond-it-> arg
+        (string? it) (str/lower-case (str/whitespace-collapse it))))
+    data))
+
+(defn walk-whitespace-collapse
+  "Walks a data structure, calling `(str/whitespace-collapse ...)` on all String values, else noop."
+  [data]
+  (walk/postwalk
+    (fn [arg] (cond-it-> arg
+                (string? it) (str/whitespace-collapse it)))
+    data))

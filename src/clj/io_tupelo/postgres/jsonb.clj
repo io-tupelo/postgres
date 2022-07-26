@@ -64,8 +64,9 @@
 ;---------------------------------------------------------------------------------------------------
 (defn edn->json-embedded
   "Accepts a Clojure EDN data structure like `{:a 1 :b {:c 3}}` and converts it into a JSON string,
-  then surrounds it with single-quotes. The result can be embedded in a Postgres JSONB expression."
-  [data] (format "' %s '" (t/edn->json data)))
+  then surrounds it with single-quotes. The result is suitable for inclusion in a Postgres JSONB expression."
+  [data]
+  (format "' %s '" (t/edn->json data)))
 
 (defn namespace-strip
   "Removes the namespace part from any keyword or symbol, otherwise NOOP."

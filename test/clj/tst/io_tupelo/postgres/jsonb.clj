@@ -39,73 +39,65 @@
   (is (truthy? (re-matches #"jdbc:postgresql://.*/acme_v01" (str conn)))))
 
 ;---------------------------------------------------------------------------------------------------
-(def index-name->create-cmd
-  {"idx_gin_my_stuff" "create index idx_gin_my_stuff on my_stuff using gin (content)"
-   })
-
 (def table-name->create-cmd
   {"my_stuff" "create table my_stuff (
                     id         text primary key,
                     content    jsonb )"
    })
 
+(def index-name->create-cmd
+  {"idx_gin_my_stuff" "create index idx_gin_my_stuff on my_stuff using gin (content)"
+   })
+
 ;---------------------------------------------------------------------------------------------------
-(s/defn drop-index!
-  [name :- s/Str]
-  (jdbc/execute! conn [(format "drop index if exists %s" name)]))
-
-(s/defn drop-table!
-  [name :- s/Str]
-  (jdbc/execute! conn [(format "drop table if exists %s" name)]))
-
-(s/defn exec-cmd!
-  [cmd :- s/Str]
-  (jdbc/execute! conn [cmd]))
-
 (defn drop-create-tables!
   [conn]
   (doseq [name (keys table-name->create-cmd)]
-    (drop-table! name)
-    (exec-cmd! (grab name table-name->create-cmd))))
+    (jdbc/execute! conn [(format "drop table if exists %s" name)])
+    (jdbc/execute! conn [(grab name table-name->create-cmd)])))
 
 (defn drop-create-indexes!
   [conn]
   (doseq [name (keys index-name->create-cmd)]
-    (drop-index! name)
-    (exec-cmd! (grab name index-name->create-cmd))))
+    (jdbc/execute! conn [(format "drop index if exists %s" name)])
+    (jdbc/execute! conn [(grab name index-name->create-cmd)])))
 
 ;---------------------------------------------------------------------------------------------------
 (verify
   (drop-create-tables! conn)
   (drop-create-indexes! conn)
+
   (sql/insert! conn :my_stuff {:id      "id001"
                                :content {:a 1 :b 2}})
   (sql/insert! conn :my_stuff {:id      "id002"
                                :content {:a 11 :b {:c 3}}})
 
-  (is= (vec (sql/query conn ["select * from my_stuff"]))
+  ; Note that next.jdbc uses table name as keyword namespace on result
+  (is= (sql/query conn ["select * from my_stuff"])
     [#:my_stuff{:content {:a 1, :b 2}, :id "id001"}
      #:my_stuff{:content {:a 11, :b {:c 3}}, :id "id002"}])
 
-  (is= (vec (sql/query conn ["select * from my_stuff where content['a'] = '1'"]))
+  (is= (sql/query conn ["select * from my_stuff where content['a'] = '1'"])
     [#:my_stuff{:content {:a 1, :b 2}, :id "id001"}])
 
-  (let [r3 (only (sql/query conn ["select * from my_stuff where content['b']['c'] = '3'"]))]
-    (is= r3 #:my_stuff{:content {:a 11, :b {:c 3}}, :id "id002"}))
+  (is= (only (sql/query conn ["select * from my_stuff where content['b']['c'] = '3'"]))
+    #:my_stuff{:content {:a 11, :b {:c 3}}, :id "id002"})
 
+  ; Embedded JSON requires single-quotes and escaped double-quotes in SQL query string
   (is= (only (sql/query conn ["select * from my_stuff where content @> '{\"a\": 1}' "]))
     #:my_stuff{:content {:a 1, :b 2}, :id "id001"})
 
+  ; Can use `(jsonb/edn->json-embedded ...)` to convert EDN to json-embedded string
   (let [cmd (it-> {:a 1}
               (jsonb/edn->json-embedded it)
               (str "select * from my_stuff where content @> " it))]
     (is= (only (sql/query conn [cmd]))
       #:my_stuff{:content {:a 1, :b 2}, :id "id001"}))
 
+  ; Can use `(walk-namespace-strip ...)` to simplify keywords on SQL query result
   (let [cmd    (it-> {:b {:c 3}}
                  (jsonb/edn->json-embedded it)
-                 (str "select id from my_stuff where content @> " it)
-                 )
+                 (str "select id from my_stuff where content @> " it))
         result (only (sql/query conn [cmd]))]
     (is= (jsonb/walk-namespace-strip result) ; 0.03 sec on laptop
       {:id "id002"}))

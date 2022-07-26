@@ -12,16 +12,6 @@
   (set! *warn-on-reflection* true))
 
 ;---------------------------------------------------------------------------------------------------
-#_(verify
-  (is= 5 (jsonb/namespace-strip 5))
-  (is= "abc" (jsonb/namespace-strip "abc"))
-  (is= :item (jsonb/namespace-strip :something.really.big/item))
-  (is= 'item (jsonb/namespace-strip 'something.really.big/item))
-  (is= (jsonb/walk-namespace-strip
-         {:a 1 :my/b [1 'her/c 3] :his/d {:e 5 :other/f :very.last/one}})
-    {:a 1 :b [1 'c 3] :d {:e 5 :f :one}}))
-
-;---------------------------------------------------------------------------------------------------
 ;---------------------------------------------------------------------------------------------------
 ; NOTE: ***** Must MANUALLY  create DB 'acme_v01' before run this test! *****
 ;       In PSQL, do `create database acme_v01;`.  See the README.

@@ -1,13 +1,14 @@
 (ns io-tupelo.postgres.jsonb
-  "Helper functions from next.jdbc docs to handle clj<->jsonb I/O"
-  (:use tupelo.core)
+  "Facilitates I/O conversion from Clojure data <-> Postgres JSONB storage.
+  Modified from next.jdbc docs (https://github.com/seancorfield/next-jdbc)"
   (:require
+    [clojure.walk :as walk]
     [jsonista.core :as json]
-    [next.jdbc :as jdbc]
+    ; [next.jdbc :as jdbc]
     [next.jdbc.prepare :as prepare]
     [next.jdbc.result-set :as rs]
-    [next.jdbc.sql :as sql]
-    [clojure.walk :as walk])
+    ; [next.jdbc.sql :as sql]
+    [tupelo.core :as t])
   (:import
     [clojure.lang IPersistentMap IPersistentVector]
     [java.sql PreparedStatement]
@@ -28,7 +29,7 @@
                  "jsonb")]
     (doto (PGobject.)
       (.setType pgtype)
-      (.setValue (edn->json x)))))
+      (.setValue (t/edn->json x)))))
 
 (defn ^:no-doc <-pgobject
   "Transform PGobject containing `json` or `jsonb` value to Clojure data."
@@ -37,7 +38,7 @@
         value (.getValue v)]
     (if (#{"jsonb" "json"} type)
       (when value
-        (with-meta (json->edn value) {:pgtype type}))
+        (with-meta (t/json->edn value) {:pgtype type}))
       value)))
 
 ; if a SQL parameter is a Clojure hash map or vector, it'll be transformed
@@ -63,16 +64,15 @@
 ;---------------------------------------------------------------------------------------------------
 (defn edn->json-embedded
   "Accepts a Clojure EDN data structure like `{:a 1 :b {:c 3}}` and converts it into a JSON string,
-  then surrounds it with single-quotes. The result is suitable for inclusion in a Postgres JSONB expression."
-  [data]
-  (format "' %s '" (edn->json data)))
+  then surrounds it with single-quotes. The result can be embedded in a Postgres JSONB expression."
+  [data] (format "' %s '" (t/edn->json data)))
 
 (defn namespace-strip
-  "Removes namespace from any keyword or symbol, otherwise NOOP."
+  "Removes the namespace part from any keyword or symbol, otherwise NOOP."
   [item]
-  (cond-it-> item
-    (keyword? item) (keyword (name item))
-    (symbol? item) (symbol (name item))))
+  (t/cond-it-> item
+    (keyword? it) (keyword (name it))
+    (symbol? it) (symbol (name it))))
 
 (defn walk-namespace-strip
   "Recursively walks a datastructure, removing the namespace from any keyword or symbol"

@@ -3,7 +3,7 @@
                  [metosin/jsonista "0.3.6"]
                  [org.clojure/clojure "1.11.1"]
                  [org.postgresql/postgresql "42.4.0"] ; see https://mvnrepository.com/artifact/org.postgresql/postgresql for info
-                 [prismatic/schema "1.3.0"]
+                 [prismatic/schema "1.3.5"]
                  [seancorfield/next.jdbc "1.2.659"]
                  [tupelo "22.07.25a"]
                  ]

@@ -1,10 +1,12 @@
 (ns tst.io-tupelo.postgres.jsonb
-  (:use tupelo.core tupelo.test)
+  (:use tupelo.core
+        tupelo.test)
   (:require
     [io-tupelo.postgres.jsonb :as jsonb]
     [next.jdbc :as jdbc]
     [next.jdbc.sql :as sql]
     [tupelo.misc :as misc]
+    [tupelo.profile :as prof]
     [tupelo.string :as str]
     ))
 
@@ -37,7 +39,7 @@
    })
 
 (def index-name->create-cmd
-  {"idx_gin_my_stuff" "create index idx_gin_my_stuff on my_stuff using gin (content)"
+  {"idx__my_stuff__gin" "create index idx__my_stuff__gin on my_stuff using gin (content)"
    })
 
 ;---------------------------------------------------------------------------------------------------
@@ -55,98 +57,114 @@
 
 ;---------------------------------------------------------------------------------------------------
 (verify
-  (drop-create-tables! conn)
-  (drop-create-indexes! conn)
+  (prof/with-timer-print :small
+    (drop-create-tables! conn)
+    (drop-create-indexes! conn)
 
-  (sql/insert! conn :my_stuff {:id      "id001"
-                               :content {:a 1 :b 2}})
-  (sql/insert! conn :my_stuff {:id      "id002"
-                               :content {:a 11 :b {:c 3}}})
+    (sql/insert! conn :my_stuff {:id      "id001"
+                                 :content {:a 1 :b 2}})
+    (sql/insert! conn :my_stuff {:id      "id002"
+                                 :content {:a 11 :b {:c 3}}})
+    (sql/insert! conn :my_stuff {:id      "id003"
+                                 :content {:a 11 :b "hello"}})
 
-  ; Note that next.jdbc uses table name as keyword namespace on result
-  (is= (sql/query conn ["select * from my_stuff"])
-    [#:my_stuff{:content {:a 1, :b 2}, :id "id001"}
-     #:my_stuff{:content {:a 11, :b {:c 3}}, :id "id002"}])
+    (prof/with-timer-print :small-inner
+      ; Note that next.jdbc uses table name as keyword namespace on result
+      (is= (sql/query conn ["select * from my_stuff"])
+        [#:my_stuff{:content {:a 1, :b 2}, :id "id001"}
+         #:my_stuff{:content {:a 11, :b {:c 3}}, :id "id002"}
+         #:my_stuff{:content {:a 11, :b "hello"}, :id "id003"}])
 
-  (is= (sql/query conn ["select * from my_stuff where content['a'] = '1'"])
-    [#:my_stuff{:content {:a 1, :b 2}, :id "id001"}])
+      ; 2 equivalent syntax versions
+      (is= [#:my_stuff{:content {:a 1, :b 2}, :id "id001"}]
+        (sql/query conn ["select * from my_stuff where content['a'] = '1'"])
+        (sql/query conn ["select * from my_stuff where content->'a' = '1'"]))
 
-  (is= (only (sql/query conn ["select * from my_stuff where content['b']['c'] = '3'"]))
-    #:my_stuff{:content {:a 11, :b {:c 3}}, :id "id002"})
+      ; 2 equivalent syntax versions
+      (is= #:my_stuff{:content {:a 11, :b {:c 3}}, :id "id002"}
+        (only (sql/query conn ["select * from my_stuff where content['b']['c'] = '3'"]))
+        (only (sql/query conn ["select * from my_stuff where content->'b'->'c' = '3'"])))
 
-  ; Embedded JSON requires single-quotes and escaped double-quotes in SQL query string
-  (is= (only (sql/query conn ["select * from my_stuff where content @> '{\"a\": 1}' "]))
-    #:my_stuff{:content {:a 1, :b 2}, :id "id001"})
+      ; note that `->` returns a jsonb object, but `->>` returns a string, so must use
+      ; an embedded json literal
+      (is= #:my_stuff{:content {:a 11, :b "hello"}, :id "id003"}
+        (only (sql/query conn ["select * from my_stuff where content->'b' = '\"hello\"'"]))
+        (only (sql/query conn ["select * from my_stuff where content->>'b' = 'hello'"])))
 
-  ; Can use `(jsonb/edn->json-embedded ...)` to convert EDN to json-embedded string
-  (let [cmd (it-> {:a 1}
-              (jsonb/edn->json-embedded it)
-              (str "select * from my_stuff where content @> " it))]
-    (is= (only (sql/query conn [cmd]))
-      #:my_stuff{:content {:a 1, :b 2}, :id "id001"}))
+      ; Embedded JSON requires single-quotes and escaped double-quotes in SQL query string
+      (is= (only (sql/query conn ["select * from my_stuff where content @> '{\"a\": 1}' "]))
+        #:my_stuff{:content {:a 1, :b 2}, :id "id001"})
 
-  ; Can use `(walk-namespace-strip ...)` to simplify keywords on SQL query result
-  (let [cmd    (it-> {:b {:c 3}}
-                 (jsonb/edn->json-embedded it)
-                 (str "select id from my_stuff where content @> " it))
-        result (only (sql/query conn [cmd]))]
-    (is= (misc/walk-namespace-strip result) ; 0.03 sec on laptop
-      {:id "id002"}))
-  )
+      ; Can use `(jsonb/edn->json-embedded ...)` to convert EDN to json-embedded string
+      (let [cmd (it-> {:a 1}
+                  (jsonb/edn->json-embedded it)
+                  (str "select * from my_stuff where content @> " it))]
+        (is= (only (sql/query conn [cmd]))
+          #:my_stuff{:content {:a 1, :b 2}, :id "id001"}))
 
+      ; Can use `(walk-namespace-strip ...)` to simplify keywords on SQL query result
+      ; i.e.  remove keywords namespace component:  `:my_stuff/id`  =>  `:id`
+      (let [cmd    (it-> {:b {:c 3}}
+                     (jsonb/edn->json-embedded it)
+                     (str "select id from my_stuff where content @> " it))
+            result (only (sql/query conn [cmd]))]
+        (is= (misc/walk-namespace-strip result) ; 0.03 sec on laptop
+          {:id "id002"}))
+      )))
 ;---------------------------------------------------------------------------------------------------
 (verify
-  (drop-create-tables! conn)
-  (drop-create-indexes! conn)
-  (sql/insert! conn :my_stuff {:id      "id001"
-                               :content {:my_group
-                                         {:created_at  "2001-12-31T11:22:33Z"
-                                          :description "ogre"
-                                          :offerings   [{:created_at    "1999-12-31T11:22:33Z"
-                                                         :ok?           true
-                                                         :description   "very good"
-                                                         :duration      12
-                                                         :duration_unit "month"
-                                                         :misc          nil
-                                                         :percent       2.0
-                                                         :amount        50000.0}
-                                                        {:created_at    "2022-12-31T10:22:33Z"
-                                                         :ok?           true
-                                                         :description   "very bad"
-                                                         :duration      30
-                                                         :duration_unit "days"
-                                                         :misc          :something
-                                                         :percent       3.0
-                                                         :amount        500.0}]}}})
+  (prof/with-timer-print :large
+    (drop-create-tables! conn)
+    (drop-create-indexes! conn)
+    (sql/insert! conn :my_stuff {:id      "id001"
+                                 :content {:my_group
+                                           {:created_at  "2001-12-31T11:22:33Z"
+                                            :description "ogre"
+                                            :offerings   [{:created_at    "1999-12-31T11:22:33Z"
+                                                           :ok?           true
+                                                           :description   "very good"
+                                                           :duration      12
+                                                           :duration_unit "month"
+                                                           :misc          nil
+                                                           :percent       2.0
+                                                           :amount        50000.0}
+                                                          {:created_at    "2022-12-31T10:22:33Z"
+                                                           :ok?           true
+                                                           :description   "very bad"
+                                                           :duration      30
+                                                           :duration_unit "days"
+                                                           :misc          :something
+                                                           :percent       3.0
+                                                           :amount        500.0}]}}})
 
 
-  (let [found    (misc/walk-namespace-strip
-                   (only (sql/query conn ["select * from my_stuff"])))
-        expected {:id      "id001"
-                  :content {:my_group
-                            {:created_at  "2001-12-31T11:22:33Z"
-                             :description "ogre"
-                             :offerings   [{:amount        50000.0
-                                            :created_at    "1999-12-31T11:22:33Z"
-                                            :description   "very good"
-                                            :duration      12
-                                            :duration_unit "month"
-                                            :misc          nil
-                                            :ok?           true
-                                            :percent       2.0}
-                                           {:amount        500.0
-                                            :created_at    "2022-12-31T10:22:33Z"
-                                            :description   "very bad"
-                                            :duration      30
-                                            :duration_unit "days"
-                                            :misc          "something"
-                                            :ok?           true
-                                            :percent       3.0}]}}}]
-    (is= found expected))
+    (let [found    (misc/walk-namespace-strip
+                     (only (sql/query conn ["select * from my_stuff"])))
+          expected {:id      "id001"
+                    :content {:my_group
+                              {:created_at  "2001-12-31T11:22:33Z"
+                               :description "ogre"
+                               :offerings   [{:amount        50000.0
+                                              :created_at    "1999-12-31T11:22:33Z"
+                                              :description   "very good"
+                                              :duration      12
+                                              :duration_unit "month"
+                                              :misc          nil
+                                              :ok?           true
+                                              :percent       2.0}
+                                             {:amount        500.0
+                                              :created_at    "2022-12-31T10:22:33Z"
+                                              :description   "very bad"
+                                              :duration      30
+                                              :duration_unit "days"
+                                              :misc          "something"
+                                              :ok?           true
+                                              :percent       3.0}]}}}]
+      (is= found expected))
 
-  (let [res (sql/query conn ["select id from my_stuff where
+    (let [res (sql/query conn ["select id from my_stuff where
             content['my_group']['offerings'] @> '[{\"description\": \"very bad\"}]'  "])]
-    (is= res [#:my_stuff{:id "id001"}])))
+      (is= res [#:my_stuff{:id "id001"}]))))
 
 
 ;---------------------------------------------------------------------------------------------------

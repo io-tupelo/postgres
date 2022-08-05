@@ -2,7 +2,6 @@
   "Facilitates I/O conversion from Clojure data <-> Postgres JSONB storage.
   Modified from next.jdbc docs (https://github.com/seancorfield/next-jdbc)"
   (:require
-    [clojure.walk :as walk]
     [jsonista.core :as json]
     ; [next.jdbc :as jdbc]
     [next.jdbc.prepare :as prepare]

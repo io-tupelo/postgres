@@ -21,7 +21,7 @@
 (def conn (jdbc/get-datasource db-info)) ; returns an inner class: "next.jdbc.connection$..."
 
 ;---------------------------------------------------------------------------------------------------
-(verify-focus
+(verify
   (prof/with-timer-print :langs
 
     ; creates & drops a connection (& transaction) for each command

@@ -13,7 +13,6 @@
             ]
 
   :global-vars {*warn-on-reflection* false}
-  :main ^:skip-aot demo.core
 
   :source-paths          ["src/clj"]
   :java-source-paths     ["src/java"]

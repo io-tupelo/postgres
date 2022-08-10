@@ -21,7 +21,7 @@
 (def conn (jdbc/get-datasource db-info)) ; returns an inner class: "next.jdbc.connection$..."
 
 ;---------------------------------------------------------------------------------------------------
-(verify
+(verify-focus
   (prof/with-timer-print :langs
 
     ; creates & drops a connection (& transaction) for each command
@@ -34,14 +34,14 @@
       (jdbc/execute-one! conn ["
         create table langs (
           id      serial,
-          lang    varchar not null
+          lang    text not null
         ) "])
 
       ; NOTE: Postgres reserves 'desc' for 'descending' (unlike H2), so must use 'description' here
       (jdbc/execute-one! conn ["
         create table releases (
           id              serial,
-          description     varchar not null,
+          description     text not null,
           langId          numeric
         ) "]))
     (is= [] (sql/query conn ["select * from langs"])) ; table exists and is empty
@@ -77,24 +77,36 @@
                ["9" java-id]
                ["10" java-id]]))
 
+          ; Note that `numeric` langid field becomes BigDecimal in Clojure,
+          ; and all result keywords have table name as namespace like :releases/langid
+          ; Also note that `rs/as-lower-maps` options makes :langid result all lowercase
+          (is-set= (sql/query tx-opts ["select * from releases"])
+            [#:releases{:description "ancients", :id 1, :langid 1M}
+             #:releases{:description "1.8", :id 2, :langid 1M}
+             #:releases{:description "1.9", :id 3, :langid 1M}
+             #:releases{:description "dusty", :id 4, :langid 2M}
+             #:releases{:description "8", :id 5, :langid 2M}
+             #:releases{:description "9", :id 6, :langid 2M}
+             #:releases{:description "10", :id 7, :langid 2M}])
+
           (let [; note cannot wrap select list in parens or get "bulk" output
-                result-0 (sql/query tx-opts ["select langs.lang, releases.description
-                                            from    langs join releases
-                                              on     (langs.id = releases.langId)
-                                              where  (lang = 'Clojure') "])
-                result-1 (sql/query tx-opts ["select l.lang, r.description
-                                            from    langs as l
+                result-0 (sql/query tx-opts ["select  langs.lang, releases.description
+                                              from    langs join releases
+                                              on      (langs.id = releases.langId)
+                                              where   (lang = 'Clojure') "])
+                result-1 (sql/query tx-opts ["select  l.lang, r.description
+                                              from    langs as l
                                                       join releases as r
-                                              on     (l.id = r.langId)
-                                              where  (l.lang = 'Clojure') "])
-                result-2 (sql/query tx-opts ["select langs.lang, releases.description
-                                            from    langs, releases
-                                              where  ( (langs.id = releases.langId)
-                                                and    (lang = 'Clojure') ) "])
-                result-3 (sql/query tx-opts ["select l.lang, r.description
-                                            from    langs as l, releases as r
-                                              where  ( (l.id = r.langId)
-                                                and    (l.lang = 'Clojure') ) "])
+                                              on      (l.id = r.langId)
+                                              where   (l.lang = 'Clojure') "])
+                result-2 (sql/query tx-opts ["select  langs.lang, releases.description
+                                              from    langs, releases
+                                              where   ( (langs.id = releases.langId)
+                                                and     (lang = 'Clojure') ) "])
+                result-3 (sql/query tx-opts ["select  l.lang, r.description
+                                              from    langs as l, releases as r
+                                              where   ( (l.id = r.langId)
+                                                and     (l.lang = 'Clojure') ) "])
                 ]
             (let [expected [{:langs/lang "Clojure", :releases/description "ancients"}
                             {:langs/lang "Clojure", :releases/description "1.8"}

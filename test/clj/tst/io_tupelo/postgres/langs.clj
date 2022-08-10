@@ -24,43 +24,43 @@
 (verify
   (prof/with-timer-print :langs
 
-    ; creates & drops a connection (& transaction) for each command
-    (jdbc/execute-one! conn ["drop table if exists langs"])
-    (jdbc/execute-one! conn ["drop table if exists releases"])
-    (throws? (sql/query conn ["select * from langs"])) ; table does not exist
+    (prof/with-timer-print :langs-init
+      ; creates & drops a connection (& transaction) for each command
+      (jdbc/execute-one! conn ["drop table if exists langs"])
+      (jdbc/execute-one! conn ["drop table if exists releases"])
+      (throws? (sql/query conn ["select * from langs"])) ; table does not exist
 
-    ; Creates and uses a connection for all commands
-    (with-open [conn (jdbc/get-connection conn)]
-      (jdbc/execute-one! conn ["
+      ; Creates and uses a connection for all commands
+      (with-open [conn (jdbc/get-connection conn)]
+        (jdbc/execute-one! conn ["
         create table langs (
           id      serial,
           lang    text not null
         ) "])
 
-      ; NOTE: Postgres reserves 'desc' for 'descending' (unlike H2), so must use 'description' here
-      (jdbc/execute-one! conn ["
+        ; NOTE: Postgres reserves 'desc' for 'descending' (unlike H2), so must use 'description' here
+        (jdbc/execute-one! conn ["
         create table releases (
           id              serial,
           description     text not null,
           langId          numeric
         ) "]))
-    (is= [] (sql/query conn ["select * from langs"])) ; table exists and is empty
+      ; table exists and is empty
+      (is= [] (sql/query conn ["select * from langs"])))
 
     ; uses one connection in a transaction for all commands
-    (jdbc/with-transaction [tx conn]
-      (let [tx-opts (jdbc/with-options tx {:builder-fn rs/as-lower-maps})]
-        (is= #:langs{:id 1, :lang "Clojure"}
-          (sql/insert! tx-opts :langs {:lang "Clojure"}))
-        (sql/insert! tx-opts :langs {:lang "Java"})
-
-        (is= (sql/query tx-opts ["select * from langs"])
-          [#:langs{:id 1, :lang "Clojure"}
-           #:langs{:id 2, :lang "Java"}])))
-
-    ; uses one connection in a transaction for all commands
-    (prof/with-timer-print :langs-tx
+    (prof/with-timer-print :langs-tx-write
       (jdbc/with-transaction [tx conn]
         (let [tx-opts (jdbc/with-options tx {:builder-fn rs/as-lower-maps})]
+
+          (is= #:langs{:id 1, :lang "Clojure"}
+            (sql/insert! tx-opts :langs {:lang "Clojure"}))
+          (sql/insert! tx-opts :langs {:lang "Java"})
+
+          (is= (sql/query tx-opts ["select * from langs"])
+            [#:langs{:id 1, :lang "Clojure"}
+             #:langs{:id 2, :lang "Java"}])
+
           (let [clj-id (grab :langs/id (only (sql/query tx-opts ["select id from langs where lang='Clojure'"])))] ; all 1 string
             (is= 1 clj-id)
             (sql/insert-multi! tx-opts :releases
@@ -75,7 +75,11 @@
               [["dusty" java-id]
                ["8" java-id]
                ["9" java-id]
-               ["10" java-id]]))
+               ["10" java-id]])))))
+
+    (prof/with-timer-print :langs-tx-query
+      (jdbc/with-transaction [tx conn]
+        (let [tx-opts (jdbc/with-options tx {:builder-fn rs/as-lower-maps})]
 
           ; Note that `numeric` langid field becomes BigDecimal in Clojure,
           ; and all result keywords have table name as namespace like :releases/langid
@@ -88,7 +92,6 @@
              #:releases{:description "8", :id 5, :langid 2M}
              #:releases{:description "9", :id 6, :langid 2M}
              #:releases{:description "10", :id 7, :langid 2M}])
-
           (let [; note cannot wrap select list in parens or get "bulk" output
                 result-0 (sql/query tx-opts ["select  langs.lang, releases.description
                                               from    langs join releases
@@ -114,6 +117,6 @@
               (is-set= result-0 expected)
               (is-set= result-1 expected)
               (is-set= result-2 expected)
-              (is-set= result-3 expected)))
-          )))))
+              (is-set= result-3 expected))))))
+    ))
 
